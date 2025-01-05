@@ -1,6 +1,10 @@
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+
 import { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../../lib/prisma'
-import dayjs from 'dayjs'
+
+dayjs.extend(utc)
 
 export default async function handler(
   req: NextApiRequest,
@@ -11,19 +15,12 @@ export default async function handler(
   }
 
   const username = String(req.query.username)
+  const { date, timezoneOffset } = req.query
 
-  if (!username) {
-    return res.status(400).json({
-      message: 'Username is required',
-    })
-  }
-
-  const { date } = req.query
-
-  if (!date) {
-    return res.status(400).json({
-      message: 'Date is required',
-    })
+  if (!date || !timezoneOffset) {
+    return res
+      .status(400)
+      .json({ message: 'Date or timezoneOffset not provided.' })
   }
 
   const user = await prisma.user.findUnique({
@@ -33,13 +30,19 @@ export default async function handler(
   })
 
   if (!user) {
-    return res.status(400).json({
-      message: 'User does not exist',
-    })
+    return res.status(400).json({ message: 'User does not exist.' })
   }
 
   const referenceDate = dayjs(String(date))
   const isPastDate = referenceDate.endOf('day').isBefore(new Date())
+
+  const timezoneOffsetInHours =
+    typeof timezoneOffset === 'string'
+      ? Number(timezoneOffset) / 60
+      : Number(timezoneOffset[0]) / 60
+
+  const referenceDateTimeZoneOffsetInHours =
+    referenceDate.toDate().getTimezoneOffset() / 60
 
   if (isPastDate) {
     return res.json({ possibleTimes: [], availableTimes: [] })
@@ -55,17 +58,18 @@ export default async function handler(
   if (!userAvailability) {
     return res.json({ possibleTimes: [], availableTimes: [] })
   }
+
   const startHourInMinutes = userAvailability.startHour
   const endHourInMinutes = userAvailability.endHour
 
   const startHour = startHourInMinutes / 60
   const endHour = endHourInMinutes / 60
 
-  const possibleTimes = Array.from({
-    length: endHour - startHour,
-  }).map((_, i) => {
-    return startHour + i
-  })
+  const possibleTimes = Array.from({ length: endHour - startHour }).map(
+    (_, i) => {
+      return startHour + i
+    },
+  )
 
   const blockedTimes = await prisma.scheduling.findMany({
     select: {
@@ -74,20 +78,30 @@ export default async function handler(
     where: {
       userId: user.id,
       date: {
-        gte: referenceDate.set('hour', startHour).toDate(),
-        lte: referenceDate.set('hour', endHour).toDate(),
+        gte: referenceDate
+          .set('hour', startHour)
+          .add(timezoneOffsetInHours, 'hours')
+          .toDate(),
+        lte: referenceDate
+          .set('hour', endHour)
+          .add(timezoneOffsetInHours, 'hours')
+          .toDate(),
       },
     },
   })
 
   const availableTimes = possibleTimes.filter((time) => {
     const isTimeBlocked = blockedTimes.some(
-      (blockedTimes) => blockedTimes.date.getHours() === time,
+      (blockedTime) =>
+        blockedTime.date.getUTCHours() - timezoneOffsetInHours === time,
     )
 
-    const isTimeInPast = referenceDate.set('hour', time).isBefore(new Date())
+    const isTimeInPast = referenceDate
+      .set('hour', time)
+      .subtract(referenceDateTimeZoneOffsetInHours, 'hours')
+      .isBefore(dayjs().utc().subtract(timezoneOffsetInHours, 'hours'))
 
-    return !isTimeInPast && !isTimeBlocked
+    return !isTimeBlocked && !isTimeInPast
   })
 
   return res.json({ possibleTimes, availableTimes })
