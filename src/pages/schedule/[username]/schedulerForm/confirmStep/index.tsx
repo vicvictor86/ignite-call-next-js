@@ -67,13 +67,22 @@ export function ConfirmStep({
 
       <label>
         <Text size="sm">Nome Completo</Text>
-        <TextInput placeholder="Seu nome" {...register('name')} />
+        <TextInput
+          crossOrigin={undefined}
+          onPointerEnterCapture={undefined}
+          onPointerLeaveCapture={undefined}
+          placeholder="Seu nome"
+          {...register('name')}
+        />
         {errors.name && <FormError>{errors.name.message}</FormError>}
       </label>
 
       <label>
         <Text size="sm">Email</Text>
         <TextInput
+          crossOrigin={undefined}
+          onPointerEnterCapture={undefined}
+          onPointerLeaveCapture={undefined}
           type="email"
           placeholder="johndoe@example.com"
           {...register('email')}

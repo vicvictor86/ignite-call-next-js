@@ -145,6 +145,9 @@ export default function TimerIntervals() {
 
                 <IntervalInputs>
                   <TextInput
+                    onPointerEnterCapture={undefined}
+                    onPointerLeaveCapture={undefined}
+                    crossOrigin={undefined}
                     size="sm"
                     type="time"
                     step={60}
@@ -152,6 +155,9 @@ export default function TimerIntervals() {
                     {...register(`intervals.${index}.startTime`)}
                   />
                   <TextInput
+                    onPointerEnterCapture={undefined}
+                    onPointerLeaveCapture={undefined}
+                    crossOrigin={undefined}
                     size="sm"
                     type="time"
                     step={60}
